@@ -8,6 +8,15 @@
 #include <iomanip>
 #include <unordered_map>
 
+
+/*
+consider struct pricelevel {
+ Order* head
+ Order* tail
+
+ map<Price, PriceLevel>
+
+ */
 using OrderID = std::uint64_t;
 using Quantity = std::uint32_t;
 using Price = std::uint32_t;
@@ -73,8 +82,8 @@ public:
 	}
 };
 
-using BidMap = std::map<Price, Order*>;
-using AskMap = std::map<Price, Order*, std::greater<Price>>; // descending key order
+using AskMap = std::map<Price, Order*>;
+using BidMap = std::map<Price, Order*, std::greater<Price>>; // descending key order
 using OrderMap = std::unordered_map<OrderID, Order*>;
 
 struct TradeInfo {
@@ -85,15 +94,13 @@ struct TradeInfo {
 };
 
 struct Trade {
-
 	TradeInfo _buyTradeInfo{};
 	TradeInfo _sellTradeInfo{};
 };
+
 using Trades = std::vector<Trade>;
 
 class OrderBook {
-
-	
 
 private:
 	BidMap _bids{};
@@ -129,7 +136,6 @@ public:
 	Trades matchOrders() {
 		Trades trades{};
 		while (true) {
-
 			if (_asks.empty() || _bids.empty()) { break; }
 			auto bidPrice = _bids.begin()->first;
 			Order* bids_head = _bids.begin()->second;
@@ -140,8 +146,7 @@ public:
 				break;
 			}
 
-			while (asks_head && bids_head) {
-		
+			while ((asks_head != nullptr) && (bids_head != nullptr)) {
 				Quantity quantity = std::min(asks_head->getQuantity(), bids_head->getQuantity());
 				bids_head->FillOrder(quantity);
 				asks_head->FillOrder(quantity);
@@ -150,30 +155,44 @@ public:
 				OrderID lastBought = bids_head->getId();
 
 				if (bids_head->isFilled()) {
-					_bids.at(bidPrice) = (bids_head->getNext());
-					bids_head = bids_head->getNext();
-					bids_head->CancelOrder();
-					_orders.erase(bids_head->getId());
+					Order* toDelete = bids_head;
+					Order* next = bids_head->getNext();
+					if (next != nullptr) {
+						_bids.at(bidPrice) = (next);
+						next->setPrev(nullptr);
+					}
+					else {
+						_bids.erase(bidPrice);
+					}
+					toDelete->CancelOrder();
+					_orders.erase(toDelete->getId());
+					bids_head = next;
 				}
 				if (asks_head->isFilled()) {
-					_asks.at(askPrice) = (asks_head->getNext());
-					asks_head = asks_head->getNext();
-					asks_head->CancelOrder();
-					_orders.erase(asks_head->getId());
+					Order* toDelete = asks_head;
+					Order* next = asks_head->getNext();
+					if (next != nullptr) {
+						_asks.at(bidPrice) = (next);
+						next->setPrev(nullptr);
+					}
+					else {
+						_asks.erase(askPrice);
+					}
+					toDelete->CancelOrder();
+					_orders.erase(toDelete->getId());
+					asks_head = next;
 				}
-				if (!asks_head) {
-					_asks.erase(askPrice);
-				}
-				if (!bids_head) {
-					_bids.erase(bidPrice);
-				}
+			
 
 				TradeInfo sellInfo{ lastSold, askPrice, quantity };
 				TradeInfo buyInfo{ lastBought, askPrice, quantity };
 				Trade newTrade{ buyInfo, sellInfo };
 				trades.push_back(newTrade);
+
+				if (_asks.size() == 0 || _bids.size() == 0) {
+					break;
+				}
 			}
-		
 		}
 		return trades;
 	}
@@ -194,7 +213,6 @@ public:
 				}
 			}
 			order->CancelOrder();
-			delete(order);
 			return true;
 		}
 		else {
@@ -208,22 +226,22 @@ public:
 				}
 			}
 			order->CancelOrder();
-			delete(order);
 			return true;
 		}
 	}
+
 	void addOrder(Order* order) {
 		if (order->getSide() == Side::Buy) {
-			if (!_bids[order->getPrice()]) { // first insertion at this price
-				_bids[order->getPrice()] = order;
+			Price price = order->getPrice();
+			if (!_bids[price]) { // first insertion at this price
+				_bids[price] = order;
 			}
 			else {  // exists order for given order price -> traverse till end of LL
-				Order* curr = _bids[order->getPrice()];
-				while (curr->getNext()) {
+				Order* curr = _bids[price];
+				while (curr->getNext() != nullptr) {
 					curr = curr->getNext();
 				}
 				curr->setNext(order);
-				order->setNext(nullptr);
 				order->setPrev(curr);
 			}
 			_orders[order->getId()] = order;
@@ -239,7 +257,6 @@ public:
 					curr = curr->getNext();
 				}
 				curr->setNext(order);
-				order->setNext(nullptr);
 				order->setPrev(curr);
 			}
 			_orders[order->getId()] = order;
@@ -249,19 +266,31 @@ public:
 
 int main()
 {
-
-	Order ord1{ 1, 100, 50, Side::Buy };
-	Order ord2{ 2, 90, 49, Side::Sell };
-	Order ord3{ 3, 10, 60, Side::Buy };
+	Order ord1{ 1, 201, 50, Side::Sell };
+	Order ord2{ 2, 100, 56, Side::Buy };
+	Order ord3{ 3, 100, 58, Side::Buy };
+	Order ord4{ 4, 49, 57, Side::Buy };
 
 	OrderBook book{ {}, {}, {} };
+
 	book.addOrder(&ord1);
 	book.addOrder(&ord2);
-	bool res = book.canMatch(Side::Buy, 48);
-	if (res) {
-		std::cout << "Can match" << "\n";
+	book.addOrder(&ord3);
+	book.addOrder(&ord4);
+	/*
+	book.addOrder(&ord5);
+	book.addOrder(&ord6);
+	book.addOrder(&ord7);
+	*/
+	Trades trades = book.matchOrders();
+
+	if (trades.size() > 0) {
+		for (auto &trade : trades) {
+			std::cout << "Trade info: "<< "Buy ID: " << trade._buyTradeInfo._orderID << ", Sell ID: " << trade._sellTradeInfo._orderID << ", Quantity: " << trade._buyTradeInfo._quantity << '\n';
+		}
 	}
 	else {
-		std::cout << "Can not match" << "\n";
+		std::cout << "No trades" << "\n";
 	}
+	
 }
