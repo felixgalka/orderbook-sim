@@ -7,7 +7,7 @@
 #include <ctime>
 #include <iomanip>
 #include <unordered_map>
-
+#include <random>
 
 /*
 consider struct pricelevel {
@@ -85,6 +85,11 @@ public:
 using AskMap = std::map<Price, Order*>;
 using BidMap = std::map<Price, Order*, std::greater<Price>>; // descending key order
 using OrderMap = std::unordered_map<OrderID, Order*>;
+
+struct PriceLevel {
+	Order* head{};
+	Order* tail{};
+};
 
 struct TradeInfo {
 	OrderID _orderID{};
@@ -167,12 +172,13 @@ public:
 					toDelete->CancelOrder();
 					_orders.erase(toDelete->getId());
 					bids_head = next;
+					delete toDelete;
 				}
 				if (asks_head->isFilled()) {
 					Order* toDelete = asks_head;
 					Order* next = asks_head->getNext();
 					if (next != nullptr) {
-						_asks.at(bidPrice) = (next);
+						_asks.at(askPrice) = (next);
 						next->setPrev(nullptr);
 					}
 					else {
@@ -181,6 +187,7 @@ public:
 					toDelete->CancelOrder();
 					_orders.erase(toDelete->getId());
 					asks_head = next;
+					delete toDelete;
 				}
 			
 
@@ -264,8 +271,8 @@ public:
 	}
 };
 
-int main()
-{
+void testOrders() {
+
 	Order ord1{ 1, 201, 50, Side::Sell };
 	Order ord2{ 2, 100, 56, Side::Buy };
 	Order ord3{ 3, 100, 58, Side::Buy };
@@ -285,12 +292,51 @@ int main()
 	Trades trades = book.matchOrders();
 
 	if (trades.size() > 0) {
-		for (auto &trade : trades) {
-			std::cout << "Trade info: "<< "Buy ID: " << trade._buyTradeInfo._orderID << ", Sell ID: " << trade._sellTradeInfo._orderID << ", Quantity: " << trade._buyTradeInfo._quantity << '\n';
+		for (auto& trade : trades) {
+			std::cout << "Trade info: " << "Buy ID: " << trade._buyTradeInfo._orderID << ", Sell ID: " << trade._sellTradeInfo._orderID << ", Quantity: " << trade._buyTradeInfo._quantity << '\n';
 		}
 	}
 	else {
 		std::cout << "No trades" << "\n";
 	}
-	
+}
+Order* generateRandomOrder(OrderID id, Price midPrice, TimeStamp ts) {
+	static std::mt19937 rng(42);
+	static std::uniform_int_distribution<int> qtyDist(1, 1000);
+	static std::normal_distribution<double> priceDist(midPrice, 5.0);
+	static std::bernoulli_distribution sideDist(0.5);
+
+	Quantity qty = qtyDist(rng);
+	Price price = static_cast<Price>(std::max<int>(1, (int)std::round(priceDist(rng))));
+	Side side = sideDist(rng) ? Side::Buy : Side::Sell;
+
+	return new Order(id, qty, price, side);
+}
+
+int main() {
+	OrderBook book{ {}, {}, {} };
+
+	std::mt19937 rng(123);
+	std::exponential_distribution<double> interArrival(1e-6); // simulated gaps
+	TimeStamp simTime = 0;
+
+	const OrderID N = 200000; // number of orders
+	auto t0 = std::chrono::high_resolution_clock::now();
+
+	for (OrderID id = 1; id <= N; ++id) {
+		simTime += static_cast<TimeStamp>(interArrival(rng) + 0.5);
+		Order* o = generateRandomOrder(id, 100, simTime);
+
+		book.addOrder(o);      // <-- correct: pass the order pointer
+		Trades trades = book.matchOrders();
+
+		// optional: handle trades logging etc.
+	}
+
+	auto t1 = std::chrono::high_resolution_clock::now();
+	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+	std::cout << "Processed " << N << " orders in " << ms << " ms\n";
+
+	// optional: clean up remaining orders in _orders (if OrderBook doesn't own deletes)
+	// for (auto &p : book._orders) delete p.second;
 }
