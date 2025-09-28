@@ -9,14 +9,9 @@
 #include <unordered_map>
 #include <random>
 
-/*
-consider struct pricelevel {
- Order* head
- Order* tail
+// 200,000 orders in 1000ms with head only LL
+// 350,000 orders in 1000ms with O(1) adding (tail and head LL)
 
- map<Price, PriceLevel>
-
- */
 using OrderID = std::uint64_t;
 using Quantity = std::uint32_t;
 using Price = std::uint32_t;
@@ -82,14 +77,15 @@ public:
 	}
 };
 
-using AskMap = std::map<Price, Order*>;
-using BidMap = std::map<Price, Order*, std::greater<Price>>; // descending key order
-using OrderMap = std::unordered_map<OrderID, Order*>;
 
 struct PriceLevel {
-	Order* head{};
-	Order* tail{};
+	Order* head{nullptr};
+	Order* tail{nullptr};
 };
+
+using AskMap = std::map<Price, PriceLevel>;
+using BidMap = std::map<Price, PriceLevel, std::greater<Price>>; // descending key order
+using OrderMap = std::unordered_map<OrderID, Order*>;
 
 struct TradeInfo {
 	OrderID _orderID{};
@@ -126,15 +122,14 @@ public:
 			if (_asks.empty()) {
 				return false;
 			}
-
-			auto bestPrice = _asks.begin()->first;
+			Price bestPrice = _asks.begin()->first;
 			return (bestPrice <= price);
 		}
 		if (side == Side::Sell) {
 			if (_bids.empty()) {
 				return false;
 			}
-			auto bestPrice = _bids.begin()->first;
+			Price bestPrice = _bids.begin()->first;
 			return (bestPrice >= price);
 		}	
 	}
@@ -142,10 +137,10 @@ public:
 		Trades trades{};
 		while (true) {
 			if (_asks.empty() || _bids.empty()) { break; }
-			auto bidPrice = _bids.begin()->first;
-			Order* bids_head = _bids.begin()->second;
-			auto askPrice = _asks.begin()->first;
-			Order* asks_head = _asks.begin()->second;
+			Price bidPrice = _bids.begin()->first;
+			Order* bids_head = (_bids.begin()->second).head;
+			Price askPrice = _asks.begin()->first;
+			Order* asks_head = (_asks.begin()->second).head;
 
 			if (askPrice > bidPrice) {
 				break;
@@ -163,7 +158,7 @@ public:
 					Order* toDelete = bids_head;
 					Order* next = bids_head->getNext();
 					if (next != nullptr) {
-						_bids.at(bidPrice) = (next);
+						_bids.at(bidPrice).head = (next);
 						next->setPrev(nullptr);
 					}
 					else {
@@ -172,13 +167,13 @@ public:
 					toDelete->CancelOrder();
 					_orders.erase(toDelete->getId());
 					bids_head = next;
-					delete toDelete;
+					//delete toDelete;
 				}
 				if (asks_head->isFilled()) {
 					Order* toDelete = asks_head;
 					Order* next = asks_head->getNext();
 					if (next != nullptr) {
-						_asks.at(askPrice) = (next);
+						_asks.at(askPrice).head = (next);
 						next->setPrev(nullptr);
 					}
 					else {
@@ -187,9 +182,8 @@ public:
 					toDelete->CancelOrder();
 					_orders.erase(toDelete->getId());
 					asks_head = next;
-					delete toDelete;
+					//delete toDelete;
 				}
-			
 
 				TradeInfo sellInfo{ lastSold, askPrice, quantity };
 				TradeInfo buyInfo{ lastBought, askPrice, quantity };
@@ -209,30 +203,45 @@ public:
 			return false;
 		}
 		Order* order = _orders[orderID];
+		Price price = order->getPrice();
 		if (order->getSide() == Side::Buy) {
-			_orders.erase(orderID);
-			if (!order->getPrev()) {
-				if (!order->getNext()) {
-					_bids.erase(order->getPrice());
+			Order* head = _bids.at(price).head;
+			Order* tail = _bids.at(price).tail;
+			if (head == nullptr) {
+				_bids.erase(price);
+			}
+			else {
+				if (order->getNext() == nullptr) {
+					_bids.at(price).tail = order->getPrev();
 				}
-				else {
-					_bids[order->getPrice()] = order->getNext();
+				if (order->getPrev() == nullptr) {
+					_bids.at(price).head = order->getNext();
 				}
 			}
+
+			_orders.erase(orderID);
 			order->CancelOrder();
+
 			return true;
 		}
 		else {
-			_orders.erase(orderID);
-			if (!order->getPrev()) {
-				if (!order->getNext()) {
-					_asks.erase(order->getPrice());
+			Order* head = _asks.at(price).head;
+			Order* tail = _asks.at(price).tail;
+			if (head == nullptr) {
+				_asks.erase(price);
+			}
+			else {
+				if (order->getNext() == nullptr) {
+					_asks.at(price).tail = order->getPrev();
 				}
-				else {
-					_asks[order->getPrice()] = order->getNext();
+				if (order->getPrev() == nullptr) {
+					_asks.at(price).head = order->getNext();
 				}
 			}
+
+			_orders.erase(orderID);
 			order->CancelOrder();
+
 			return true;
 		}
 	}
@@ -240,31 +249,27 @@ public:
 	void addOrder(Order* order) {
 		if (order->getSide() == Side::Buy) {
 			Price price = order->getPrice();
-			if (!_bids[price]) { // first insertion at this price
-				_bids[price] = order;
+			if (!(_bids[price].head)) { // first insertion at this price
+				_bids[price].head = order;
+				_bids[price].tail = order;
 			}
 			else {  // exists order for given order price -> traverse till end of LL
-				Order* curr = _bids[price];
-				while (curr->getNext() != nullptr) {
-					curr = curr->getNext();
-				}
-				curr->setNext(order);
-				order->setPrev(curr);
+				Order* end = _bids[price].tail;
+				end->setNext(order);
+				_bids[price].tail = order;
 			}
 			_orders[order->getId()] = order;
 		}
 		else {
 			Price price = order->getPrice();
-			if (!_asks[price]) { // first insertion at this price
-				_asks[price] = order;
+			if (!(_asks[price].head)) { // first insertion at this price
+				_asks[price].head = order;
+				_asks[price].tail = order;
 			}
-			else {
-				Order* curr = _asks[price];
-				while (curr->getNext()) {
-					curr = curr->getNext();
-				}
-				curr->setNext(order);
-				order->setPrev(curr);
+			else {  // exists order for given order price -> traverse till end of LL
+				Order* end = _asks[price].tail;
+				end->setNext(order);
+				_asks[price].tail = order;
 			}
 			_orders[order->getId()] = order;
 		}
@@ -273,9 +278,9 @@ public:
 
 void testOrders() {
 
-	Order ord1{ 1, 201, 50, Side::Sell };
-	Order ord2{ 2, 100, 56, Side::Buy };
-	Order ord3{ 3, 100, 58, Side::Buy };
+	Order ord1{ 1, 200, 50, Side::Sell };
+	Order ord2{ 2, 100, 49, Side::Sell };
+	Order ord3{ 3, 250, 51, Side::Buy };
 	Order ord4{ 4, 49, 57, Side::Buy };
 
 	OrderBook book{ {}, {}, {} };
@@ -312,31 +317,30 @@ Order* generateRandomOrder(OrderID id, Price midPrice, TimeStamp ts) {
 
 	return new Order(id, qty, price, side);
 }
-
-int main() {
+void testSpeed() {
 	OrderBook book{ {}, {}, {} };
 
 	std::mt19937 rng(123);
-	std::exponential_distribution<double> interArrival(1e-6); // simulated gaps
+	std::exponential_distribution<double> interArrival(1e-6);
 	TimeStamp simTime = 0;
 
-	const OrderID N = 200000; // number of orders
+	const OrderID N = 350000; //
 	auto t0 = std::chrono::high_resolution_clock::now();
 
 	for (OrderID id = 1; id <= N; ++id) {
 		simTime += static_cast<TimeStamp>(interArrival(rng) + 0.5);
 		Order* o = generateRandomOrder(id, 100, simTime);
 
-		book.addOrder(o);      // <-- correct: pass the order pointer
+		book.addOrder(o);      
 		Trades trades = book.matchOrders();
 
-		// optional: handle trades logging etc.
 	}
 
 	auto t1 = std::chrono::high_resolution_clock::now();
 	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
 	std::cout << "Processed " << N << " orders in " << ms << " ms\n";
 
-	// optional: clean up remaining orders in _orders (if OrderBook doesn't own deletes)
-	// for (auto &p : book._orders) delete p.second;
+}
+int main() {
+	testOrders();
 }
