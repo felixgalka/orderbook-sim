@@ -1,4 +1,3 @@
-
 #include <iostream>
 #include <vector>
 #include <string>
@@ -331,7 +330,7 @@ void testSpeed() {
 		simTime += static_cast<TimeStamp>(interArrival(rng) + 0.5);
 		Order* o = generateRandomOrder(id, 100, simTime);
 
-		book.addOrder(o);      
+		book.addOrder(o);
 		Trades trades = book.matchOrders();
 
 	}
@@ -340,7 +339,4 @@ void testSpeed() {
 	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
 	std::cout << "Processed " << N << " orders in " << ms << " ms\n";
 
-}
-int main() {
-	testOrders();
 }
