@@ -125,14 +125,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Order.cpp" />
-    <ClCompile Include="OrderBook.cpp" />
-    <ClCompile Include="Tests.cpp" />
+    <ClCompile Include="src\Order.cpp" />
+    <ClCompile Include="src\OrderBook.cpp" />
+    <ClCompile Include="src\Tests.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Order.h" />
-    <ClInclude Include="OrderBook.h" />
-    <ClInclude Include="Tests.h" />
+    <ClInclude Include="include\Order.h" />
+    <ClInclude Include="include\OrderBook.h" />
+    <ClInclude Include="include\Tests.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

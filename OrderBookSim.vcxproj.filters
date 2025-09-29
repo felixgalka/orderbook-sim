@@ -13,34 +13,28 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="include">
-      <UniqueIdentifier>{2683080b-d135-419f-a84c-db2d6e4e1bb5}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="src">
-      <UniqueIdentifier>{02f938cc-2139-4d76-b9b4-8f4cbdefd1b6}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Order.cpp">
-      <Filter>src</Filter>
+    <ClCompile Include="src\Order.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="OrderBook.cpp">
-      <Filter>src</Filter>
+    <ClCompile Include="src\OrderBook.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Tests.cpp">
-      <Filter>src</Filter>
+    <ClCompile Include="src\Tests.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Order.h">
-      <Filter>include</Filter>
+    <ClInclude Include="include\Order.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="OrderBook.h">
-      <Filter>include</Filter>
+    <ClInclude Include="include\OrderBook.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Tests.h">
-      <Filter>include</Filter>
+    <ClInclude Include="include\Tests.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
